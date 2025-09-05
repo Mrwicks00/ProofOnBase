@@ -43,7 +43,7 @@ import {
   registerDidWithWallet,
   checkDidRegistration,
 } from "@/hooks/useDid";
-import { useRegistrantProfile } from "@/hooks/useRegistrantProfile";
+import { useBasenameIdentity } from "@/hooks/useBasenameIdentity";
 import { generateProof, verifyOnChain } from "@/hooks/useProof";
 import { didFromAddress, truncateAddress } from "@/lib/utils";
 import QRCode from "react-qr-code";
@@ -97,8 +97,9 @@ export default function ProofOnBaseApp() {
   const chainId = useChainId();
   const { data: walletClient } = useWalletClient();
 
-  // ENS profile hook
-  const { profile: ensProfile, isLoading: ensLoading } = useRegistrantProfile();
+  // Basename/ENS identity hook
+  const { profile: identityProfile, isLoading: identityLoading } =
+    useBasenameIdentity();
   const { writeContract, isPending: isContractPending } = useWriteContract();
 
   // Our custom hooks
@@ -248,16 +249,16 @@ export default function ProofOnBaseApp() {
       }
       const result = await registerDidWithWallet(walletClient, "");
 
-      // Optionally store ENS profile information (non-blocking)
-      if (ensProfile) {
+      // Optionally store identity profile information (non-blocking)
+      if (identityProfile) {
         try {
           await fetch("/api/register-profile", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(ensProfile),
+            body: JSON.stringify(identityProfile),
           });
         } catch (profileError) {
-          console.warn("Failed to store ENS profile:", profileError);
+          console.warn("Failed to store identity profile:", profileError);
           // Don't fail the main registration if profile storage fails
         }
       }
@@ -265,7 +266,7 @@ export default function ProofOnBaseApp() {
       toast({
         title: "DID Registered",
         description: `Successfully registered ${result.did}${
-          ensProfile?.ensName ? ` (${ensProfile.ensName})` : ""
+          identityProfile?.name ? ` (${identityProfile.name})` : ""
         }`,
       });
     } catch (error: any) {
@@ -1148,15 +1149,15 @@ export default function ProofOnBaseApp() {
                       <User className="w-8 h-8 text-muted-foreground" />
                     </div>
 
-                    {/* ENS Profile Information */}
-                    {ensLoading ? (
+                    {/* Identity Profile Information */}
+                    {identityLoading ? (
                       <div className="mb-4">
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-2" />
                         <p className="text-sm text-muted-foreground">
-                          Checking for ENS name...
+                          Resolving name...
                         </p>
                       </div>
-                    ) : ensProfile ? (
+                    ) : identityProfile ? (
                       <div className="mb-6 p-4 bg-muted/50 rounded-lg border border-border text-left">
                         <h4 className="text-sm font-medium text-foreground mb-3">
                           Identity Profile
@@ -1167,43 +1168,55 @@ export default function ProofOnBaseApp() {
                               Address:
                             </span>
                             <code className="text-foreground font-mono">
-                              {truncateAddress(ensProfile.address)}
+                              {truncateAddress(identityProfile.address)}
                             </code>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">
-                              ENS/Basename:
+                              Primary name:
                             </span>
                             <span className="text-foreground">
-                              {ensProfile.ensName ? (
+                              {identityProfile.name ? (
                                 <span className="flex items-center gap-1">
-                                  {ensProfile.ensName}
-                                  {ensProfile.reverseOK ? (
-                                    <CheckCircle className="w-3 h-3 text-green-400" />
+                                  {identityProfile.name}
+                                  {identityProfile.reverseOK ? (
+                                    <span className="text-green-400">✓</span>
                                   ) : (
                                     <span className="text-yellow-400 text-xs">
-                                      (unverified)
+                                      (not primary)
                                     </span>
                                   )}
                                 </span>
                               ) : (
                                 <span className="text-muted-foreground">
-                                  None
+                                  — (none)
                                 </span>
                               )}
                             </span>
                           </div>
                           <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Source:
+                            </span>
+                            <span className="text-foreground">
+                              {identityProfile.source === "basename"
+                                ? "Basename"
+                                : identityProfile.source === "ens"
+                                ? "ENS"
+                                : "Wallet only"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
                             <span className="text-muted-foreground">DID:</span>
                             <code className="text-foreground font-mono text-xs break-all">
-                              {ensProfile.did}
+                              {identityProfile.did}
                             </code>
                           </div>
                         </div>
-                        {!ensProfile.ensName && (
+                        {!identityProfile.name && (
                           <div className="text-xs text-muted-foreground mt-3 p-2 bg-muted rounded">
                             <p className="mb-2">
-                              💡 No ENS/Basename found. You can still register
+                              💡 No Basename/ENS found. You can still register
                               with your wallet address.
                             </p>
                             <p>
@@ -1256,8 +1269,8 @@ export default function ProofOnBaseApp() {
                       </span>
                     </div>
 
-                    {/* ENS Profile Information for Registered Users */}
-                    {ensProfile && (
+                    {/* Identity Profile Information for Registered Users */}
+                    {identityProfile && (
                       <div className="p-4 bg-muted/50 rounded-lg border border-border">
                         <h4 className="text-sm font-medium text-foreground mb-3">
                           Identity Profile
@@ -1268,30 +1281,42 @@ export default function ProofOnBaseApp() {
                               Address:
                             </span>
                             <code className="text-foreground font-mono">
-                              {truncateAddress(ensProfile.address)}
+                              {truncateAddress(identityProfile.address)}
                             </code>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">
-                              ENS/Basename:
+                              Primary name:
                             </span>
                             <span className="text-foreground">
-                              {ensProfile.ensName ? (
+                              {identityProfile.name ? (
                                 <span className="flex items-center gap-1">
-                                  {ensProfile.ensName}
-                                  {ensProfile.reverseOK ? (
-                                    <CheckCircle className="w-3 h-3 text-green-400" />
+                                  {identityProfile.name}
+                                  {identityProfile.reverseOK ? (
+                                    <span className="text-green-400">✓</span>
                                   ) : (
                                     <span className="text-yellow-400 text-xs">
-                                      (unverified)
+                                      (not primary)
                                     </span>
                                   )}
                                 </span>
                               ) : (
                                 <span className="text-muted-foreground">
-                                  None
+                                  — (none)
                                 </span>
                               )}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Source:
+                            </span>
+                            <span className="text-foreground">
+                              {identityProfile.source === "basename"
+                                ? "Basename"
+                                : identityProfile.source === "ens"
+                                ? "ENS"
+                                : "Wallet only"}
                             </span>
                           </div>
                         </div>

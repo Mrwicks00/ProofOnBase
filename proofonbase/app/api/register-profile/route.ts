@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
-    const { address, ensName, reverseOK, did } = await req.json();
+    const { address, name, source, reverseOK, did } = await req.json();
 
     if (!address || !did) {
       return NextResponse.json(
@@ -12,12 +12,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Store minimal identity (works without ENS)
+    // Store minimal identity (works without Basename/ENS)
     const user = {
       address: address.toLowerCase(),
       did,
-      ensName: ensName ?? null,
-      ensVerified: !!ensName && !!reverseOK, // true only if reverse matches
+      name: name ?? null,
+      source: source ?? null,
+      verified: !!name && !!reverseOK, // true only if reverse matches
       createdAt: Date.now(),
     };
 
