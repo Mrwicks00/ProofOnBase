@@ -1213,24 +1213,73 @@ export default function ProofOnBaseApp() {
                             </code>
                           </div>
                         </div>
+                        {identityProfile.name && !identityProfile.reverseOK && (
+                          <div className="text-xs text-yellow-400 mt-2 p-2 bg-yellow-500/10 rounded border border-yellow-500/20">
+                            <p className="font-medium mb-1">
+                              ⚠️ Name not set as Primary
+                            </p>
+                            <p>
+                              Go to{" "}
+                              <a
+                                href="https://base.org/names"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-yellow-300 hover:underline"
+                              >
+                                base.org/names
+                              </a>{" "}
+                              → Find "{identityProfile.name}" → ⋯ → "Set as
+                              primary"
+                            </p>
+                          </div>
+                        )}
                         {!identityProfile.name && (
                           <div className="text-xs text-muted-foreground mt-3 p-2 bg-muted rounded">
                             <p className="mb-2">
                               💡 No Basename/ENS found. You can still register
                               with your wallet address.
                             </p>
-                            <p>
-                              Want a Basename? Check out{" "}
-                              <a
-                                href="https://basename.org"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline"
-                              >
-                                basename.org
-                              </a>{" "}
-                              for Base-native names.
-                            </p>
+                            <div className="space-y-2">
+                              <p>
+                                <strong>
+                                  Have a Basename but not showing?
+                                </strong>
+                              </p>
+                              <p>
+                                1. Go to{" "}
+                                <a
+                                  href="https://base.org/names"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary hover:underline"
+                                >
+                                  base.org/names
+                                </a>
+                              </p>
+                              <p>
+                                2. Find your Basename → ⋯ → "Set as primary"
+                              </p>
+                              <p>
+                                3. Refresh this page or{" "}
+                                <button
+                                  onClick={() => window.location.reload()}
+                                  className="text-primary hover:underline font-medium"
+                                >
+                                  click here to refresh
+                                </button>
+                              </p>
+                              <p>
+                                Want a Basename? Check out{" "}
+                                <a
+                                  href="https://basename.org"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary hover:underline"
+                                >
+                                  basename.org
+                                </a>
+                              </p>
+                            </div>
                           </div>
                         )}
                       </div>

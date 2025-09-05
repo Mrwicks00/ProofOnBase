@@ -18,17 +18,17 @@ export function useBasenameIdentity() {
   const activeChainId = useChainId();
   const [profile, setProfile] = useState<IdentityProfile | null>(null);
 
-  // 1) Prefer Basename on Base
+  // 1) Prefer Basename on Base (chainId: 8453)
   const basename = useEnsName({
     address,
-    chainId: base.id,
+    chainId: base.id, // 8453 - Base mainnet
     query: { enabled: !!address },
   });
 
   // 2) Fallback to L1 ENS if no Basename
   const ens = useEnsName({
     address,
-    chainId: mainnet.id,
+    chainId: mainnet.id, // 1 - Ethereum mainnet
     query: { enabled: !!address && !basename.data },
   });
 
@@ -48,8 +48,21 @@ export function useBasenameIdentity() {
   useEffect(() => {
     if (!address) return setProfile(null);
     const did = `did:pkh:eip155:${activeChainId ?? base.id}:${address}`;
+    
+    // Debug logging
+    console.log("Basename Identity Debug:", {
+      address,
+      basenameData: basename.data,
+      ensData: ens.data,
+      name,
+      source,
+      reverseOK,
+      basenameLoading: basename.isFetching,
+      ensLoading: ens.isFetching,
+    });
+    
     setProfile({ address, name, source, reverseOK, did });
-  }, [address, activeChainId, name, source, reverseOK]);
+  }, [address, activeChainId, name, source, reverseOK, basename.data, ens.data, basename.isFetching, ens.isFetching]);
 
   return { profile, isLoading: !address || basename.isFetching || ens.isFetching };
 }
