@@ -43,6 +43,7 @@ import {
   registerDidWithWallet,
   checkDidRegistration,
 } from "@/hooks/useDid";
+import { useRegistrantProfile } from "@/hooks/useRegistrantProfile";
 import { generateProof, verifyOnChain } from "@/hooks/useProof";
 import { didFromAddress, truncateAddress } from "@/lib/utils";
 import QRCode from "react-qr-code";
@@ -95,11 +96,14 @@ export default function ProofOnBaseApp() {
   const { data: balance } = useBalance({ address });
   const chainId = useChainId();
   const { data: walletClient } = useWalletClient();
+
+  // ENS profile hook
+  const { profile: ensProfile, isLoading: ensLoading } = useRegistrantProfile();
   const { writeContract, isPending: isContractPending } = useWriteContract();
 
   // Our custom hooks
   const { get: getCredential, set: setCredential } = useCredential();
-  const { get: getUserDid } = useDid();
+  const { get: getUserDid, clear: clearUserDid } = useDid();
 
   // App state
   const [isRegistering, setIsRegistering] = useState(false);
@@ -143,6 +147,28 @@ export default function ProofOnBaseApp() {
     typeof window !== "undefined" ? getCredential() : null;
   const storedUserDid = typeof window !== "undefined" ? getUserDid() : null;
 
+  // Debug logging for network detection
+  useEffect(() => {
+    console.log("Network Debug:", { chainId, isCorrectNetwork, address });
+  }, [chainId, isCorrectNetwork, address]);
+
+  // Clear stored DID when wallet address changes
+  useEffect(() => {
+    if (address && storedUserDid) {
+      const currentUserDID = didFromAddress(address);
+      if (storedUserDid !== currentUserDID) {
+        console.log("Wallet changed, clearing stored DID:", {
+          storedUserDid,
+          currentUserDID,
+        });
+        clearUserDid();
+      }
+    } else if (!address && storedUserDid) {
+      console.log("Wallet disconnected, clearing stored DID");
+      clearUserDid();
+    }
+  }, [address, storedUserDid, clearUserDid]);
+
   // Client-side mounting effect
   useEffect(() => {
     setMounted(true);
@@ -157,6 +183,21 @@ export default function ProofOnBaseApp() {
       }
     }
   }, []);
+
+  // Verify stored DID belongs to current address
+  useEffect(() => {
+    if (address && storedUserDid && typeof window !== "undefined") {
+      const currentUserDID = didFromAddress(address);
+      if (storedUserDid !== currentUserDID) {
+        console.log("Stored DID doesn't match current address, clearing:", {
+          storedUserDid,
+          currentUserDID,
+          address,
+        });
+        clearUserDid();
+      }
+    }
+  }, [address, storedUserDid, clearUserDid]);
 
   // Check DID registration when wallet connects
   useEffect(() => {
@@ -206,9 +247,26 @@ export default function ProofOnBaseApp() {
         throw new Error("Wallet not connected");
       }
       const result = await registerDidWithWallet(walletClient, "");
+
+      // Optionally store ENS profile information (non-blocking)
+      if (ensProfile) {
+        try {
+          await fetch("/api/register-profile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(ensProfile),
+          });
+        } catch (profileError) {
+          console.warn("Failed to store ENS profile:", profileError);
+          // Don't fail the main registration if profile storage fails
+        }
+      }
+
       toast({
         title: "DID Registered",
-        description: `Successfully registered ${result.did}`,
+        description: `Successfully registered ${result.did}${
+          ensProfile?.ensName ? ` (${ensProfile.ensName})` : ""
+        }`,
       });
     } catch (error: any) {
       toast({
@@ -704,10 +762,10 @@ export default function ProofOnBaseApp() {
                 }`}
               />
               <span className="hidden sm:inline">
-                {truncateAddress(address)}
+                {truncateAddress(address)} (Chain: {chainId})
               </span>
               <span className="sm:hidden">
-                {address.slice(0, 4)}...{address.slice(-2)}
+                {address.slice(0, 4)}...{address.slice(-2)} ({chainId})
               </span>
             </div>
           </Badge>
@@ -738,7 +796,10 @@ export default function ProofOnBaseApp() {
                 </h4>
                 <p className="text-xs text-yellow-400/80">
                   You're connected to chain ID {chainId}. Switch to Base Sepolia
-                  (84532) to use ProofOnBase.
+                  (84532) to use ProofOnBase.{" "}
+                  {isCorrectNetwork
+                    ? "✅ Network is correct!"
+                    : "❌ Wrong network"}
                 </p>
               </div>
             </div>
@@ -1086,6 +1147,82 @@ export default function ProofOnBaseApp() {
                     <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                       <User className="w-8 h-8 text-muted-foreground" />
                     </div>
+
+                    {/* ENS Profile Information */}
+                    {ensLoading ? (
+                      <div className="mb-4">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground">
+                          Checking for ENS name...
+                        </p>
+                      </div>
+                    ) : ensProfile ? (
+                      <div className="mb-6 p-4 bg-muted/50 rounded-lg border border-border text-left">
+                        <h4 className="text-sm font-medium text-foreground mb-3">
+                          Identity Profile
+                        </h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Address:
+                            </span>
+                            <code className="text-foreground font-mono">
+                              {truncateAddress(ensProfile.address)}
+                            </code>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              ENS/Basename:
+                            </span>
+                            <span className="text-foreground">
+                              {ensProfile.ensName ? (
+                                <span className="flex items-center gap-1">
+                                  {ensProfile.ensName}
+                                  {ensProfile.reverseOK ? (
+                                    <CheckCircle className="w-3 h-3 text-green-400" />
+                                  ) : (
+                                    <span className="text-yellow-400 text-xs">
+                                      (unverified)
+                                    </span>
+                                  )}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">
+                                  None
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">DID:</span>
+                            <code className="text-foreground font-mono text-xs break-all">
+                              {ensProfile.did}
+                            </code>
+                          </div>
+                        </div>
+                        {!ensProfile.ensName && (
+                          <div className="text-xs text-muted-foreground mt-3 p-2 bg-muted rounded">
+                            <p className="mb-2">
+                              💡 No ENS/Basename found. You can still register
+                              with your wallet address.
+                            </p>
+                            <p>
+                              Want a Basename? Check out{" "}
+                              <a
+                                href="https://basename.org"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline"
+                              >
+                                basename.org
+                              </a>{" "}
+                              for Base-native names.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+
                     <p className="text-muted-foreground mb-4">
                       Your DID: {userDID}
                     </p>
@@ -1118,18 +1255,77 @@ export default function ProofOnBaseApp() {
                         DID Registered
                       </span>
                     </div>
+
+                    {/* ENS Profile Information for Registered Users */}
+                    {ensProfile && (
+                      <div className="p-4 bg-muted/50 rounded-lg border border-border">
+                        <h4 className="text-sm font-medium text-foreground mb-3">
+                          Identity Profile
+                        </h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Address:
+                            </span>
+                            <code className="text-foreground font-mono">
+                              {truncateAddress(ensProfile.address)}
+                            </code>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              ENS/Basename:
+                            </span>
+                            <span className="text-foreground">
+                              {ensProfile.ensName ? (
+                                <span className="flex items-center gap-1">
+                                  {ensProfile.ensName}
+                                  {ensProfile.reverseOK ? (
+                                    <CheckCircle className="w-3 h-3 text-green-400" />
+                                  ) : (
+                                    <span className="text-yellow-400 text-xs">
+                                      (unverified)
+                                    </span>
+                                  )}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">
+                                  None
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between p-4 bg-muted rounded-lg border border-border">
                       <code className="font-mono text-sm text-foreground break-all mr-4">
                         {storedUserDid}
                       </code>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => copyToClipboard(storedUserDid, "DID")}
-                        className="hover:bg-primary/20 flex-shrink-0"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center space-x-2 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => copyToClipboard(storedUserDid, "DID")}
+                          className="hover:bg-primary/20"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            clearUserDid();
+                            toast({
+                              title: "DID Cleared",
+                              description: "Stored DID has been cleared",
+                            });
+                          }}
+                          className="hover:bg-red-500/20 text-red-400"
+                        >
+                          Clear
+                        </Button>
+                      </div>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       This is your unique decentralized identifier on the Base
