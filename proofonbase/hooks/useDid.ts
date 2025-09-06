@@ -9,7 +9,8 @@ import type { WalletClient } from "viem";
 
 export async function registerDidWithWallet(
   walletClient: WalletClient,
-  didDocumentURI = ""
+  didDocumentURI = "",
+  name?: string | null
 ) {
   // Convert viem wallet client to ethers provider
   const provider = new ethers.BrowserProvider(walletClient as any);
@@ -20,7 +21,16 @@ export async function registerDidWithWallet(
 
   const n = ADDRESSES.baseSepolia;
   const reg = new ethers.Contract(n.DIDRegistry, DIDRegistryABI, signer);
-  const tx = await reg.registerDID(hash, didDocumentURI);
+  
+  // Create a metadata URI that includes the name if available
+  const metadata = {
+    did,
+    ...(name && { name }),
+    registeredAt: new Date().toISOString(),
+  };
+  const metadataURI = `data:application/json;base64,${Buffer.from(JSON.stringify(metadata)).toString('base64')}`;
+  
+  const tx = await reg.registerDID(hash, metadataURI);
   await tx.wait();
 
   if (typeof window !== "undefined") {

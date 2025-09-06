@@ -8,6 +8,8 @@ const schema = z.object({
   birthYear: z.number().int().min(1900).max(2100),
   birthMonth: z.number().int().min(1).max(12),
   birthDay: z.number().int().min(1).max(31),
+  subjectName: z.string().optional(), // Optional name for display
+  subjectAddress: z.string().optional(), // Wallet address for verification
 });
 
 export async function POST(req: NextRequest) {
@@ -29,6 +31,9 @@ export async function POST(req: NextRequest) {
       issuer: "did:proofonbase:demo-issuer",
       issuedAt,
       expiresAt,
+      // Include name metadata if available
+      ...(input.subjectName && { subjectName: input.subjectName }),
+      ...(input.subjectAddress && { subjectAddress: input.subjectAddress }),
     };
 
     const credentialHash = ethers.keccak256(

@@ -141,7 +141,8 @@ export default function ProofOnBaseApp() {
 
   // Derived state
   const isCorrectNetwork = chainId === 84532; // Base Sepolia
-  const userDID = address ? didFromAddress(address) : "";
+  const userDID =
+    identityProfile?.did || (address ? didFromAddress(address) : "");
 
   // Only access localStorage on client-side
   const storedCredential =
@@ -247,7 +248,11 @@ export default function ProofOnBaseApp() {
       if (!walletClient) {
         throw new Error("Wallet not connected");
       }
-      const result = await registerDidWithWallet(walletClient, "");
+      const result = await registerDidWithWallet(
+        walletClient,
+        "",
+        identityProfile?.name
+      );
 
       // Optionally store identity profile information (non-blocking)
       if (identityProfile) {
@@ -307,6 +312,9 @@ export default function ProofOnBaseApp() {
           birthYear: parseInt(issueForm.birthYear),
           birthMonth: parseInt(issueForm.birthMonth),
           birthDay: parseInt(issueForm.birthDate),
+          // Include name and address metadata if available
+          ...(identityProfile?.name && { subjectName: identityProfile.name }),
+          ...(address && { subjectAddress: address }),
         }),
       });
 
@@ -358,7 +366,12 @@ export default function ProofOnBaseApp() {
       const response = await fetch("/api/challenge/new", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential }),
+        body: JSON.stringify({
+          credential,
+          // Include name and address for QR display
+          ...(identityProfile?.name && { subjectName: identityProfile.name }),
+          ...(address && { subjectAddress: address }),
+        }),
       });
 
       if (!response.ok) {
@@ -893,6 +906,12 @@ export default function ProofOnBaseApp() {
                   Verification Details
                 </h4>
                 <div className="space-y-1 text-xs text-muted-foreground">
+                  {verificationData.subjectName && (
+                    <p>
+                      <span className="font-medium">Subject Name:</span>{" "}
+                      {verificationData.subjectName}
+                    </p>
+                  )}
                   <p>
                     <span className="font-medium">Age Verified:</span>{" "}
                     {verificationData.ageVerified ? "18+" : "Under 18"}

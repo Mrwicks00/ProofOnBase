@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
       .substr(2, 9)}`;
 
     const body = await request.json();
-    const { credential } = body;
+    const { credential, subjectName, subjectAddress } = body;
 
     if (!credential) {
       return NextResponse.json(
@@ -32,6 +32,9 @@ export async function POST(request: NextRequest) {
       t: "age18",
       challenge,
       sessionId,
+      // Include name for display if available
+      ...(subjectName && { subjectName }),
+      ...(subjectAddress && { subjectAddress }),
       // Credential stored in Redis session, not in QR
     });
 

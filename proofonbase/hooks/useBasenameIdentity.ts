@@ -4,14 +4,18 @@
 import { useAccount, useChainId } from "wagmi";
 import { base } from "wagmi/chains";
 import { useEffect, useState } from "react";
-import { getBasename, getEnsName, verifyReverseResolution } from "@/lib/basenames";
+import {
+  getBasename,
+  getEnsName,
+  verifyReverseResolution,
+} from "@/lib/basenames";
 
 type IdentityProfile = {
   address: `0x${string}`;
-  name: string | null;                // Basename or ENS
-  source: "basename" | "ens" | null;  // where it came from
-  reverseOK: boolean;                 // name -> addr equals wallet
-  did: string;                        // did:pkh
+  name: string | null; // Basename or ENS
+  source: "basename" | "ens" | null; // where it came from
+  reverseOK: boolean; // name -> addr equals wallet
+  did: string; // did:pkh
 };
 
 export function useBasenameIdentity() {
@@ -28,16 +32,16 @@ export function useBasenameIdentity() {
 
     const resolveIdentity = async () => {
       setIsLoading(true);
-      
+
       try {
         // 1) Try to resolve Basename on Base first
         console.log("Resolving Basename for address:", address);
         const basename = await getBasename(address);
         console.log("Basename result:", basename);
-        
+
         let name: string | null = null;
         let source: IdentityProfile["source"] = null;
-        
+
         if (basename) {
           name = basename;
           source = "basename";
@@ -46,13 +50,13 @@ export function useBasenameIdentity() {
           console.log("No Basename found, trying ENS...");
           const ensName = await getEnsName(address);
           console.log("ENS result:", ensName);
-          
+
           if (ensName) {
             name = ensName;
             source = "ens";
           }
         }
-        
+
         // 3) Verify reverse resolution if we found a name
         let reverseOK = false;
         if (name) {
@@ -60,9 +64,14 @@ export function useBasenameIdentity() {
           reverseOK = await verifyReverseResolution(name, address);
           console.log("Reverse verification result:", reverseOK);
         }
-        
-        const did = `did:pkh:eip155:${activeChainId ?? base.id}:${address}`;
-        
+
+        // Generate name-based DID if name is available and reverse resolution is OK
+        // Otherwise fallback to address-based DID
+        const did =
+          name && reverseOK
+            ? `did:pkh:eip155:${activeChainId ?? base.id}:${name}`
+            : `did:pkh:eip155:${activeChainId ?? base.id}:${address}`;
+
         const newProfile: IdentityProfile = {
           address,
           name,
@@ -70,10 +79,9 @@ export function useBasenameIdentity() {
           reverseOK,
           did,
         };
-        
+
         console.log("Final profile:", newProfile);
         setProfile(newProfile);
-        
       } catch (error) {
         console.error("Error resolving identity:", error);
         const did = `did:pkh:eip155:${activeChainId ?? base.id}:${address}`;

@@ -86,17 +86,25 @@ export async function POST(request: NextRequest) {
 
       console.log("Verification submitted successfully:", submitResult);
 
+      // Include name information from session if available
+      const resultWithName = {
+        ...submitResult,
+        ...(session.credential?.subjectName && { subjectName: session.credential.subjectName }),
+        ...(session.credential?.subjectAddress && { subjectAddress: session.credential.subjectAddress }),
+        timestamp: Date.now(),
+      };
+
       // Update session based on age verification result
       if (submitResult.isOver18 === true) {
         await updateSession(sessionId, {
           status: "success",
-          result: submitResult,
+          result: resultWithName,
           completedAt: Date.now(),
         });
       } else {
         await updateSession(sessionId, {
           status: "failed",
-          result: submitResult,
+          result: resultWithName,
           error: "User is under 18",
           completedAt: Date.now(),
         });
@@ -105,7 +113,7 @@ export async function POST(request: NextRequest) {
       const response = NextResponse.json({
         success: submitResult.isOver18 === true,
         status: submitResult.isOver18 === true ? "success" : "failed",
-        result: submitResult,
+        result: resultWithName,
         sessionId,
       });
 
