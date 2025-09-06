@@ -1,9 +1,10 @@
 // hooks/useBasenameIdentity.ts
 "use client";
 
-import { useAccount, useChainId, useEnsName, useEnsAddress } from "wagmi";
-import { base, mainnet } from "wagmi/chains";
-import { useEffect, useMemo, useState } from "react";
+import { useAccount, useChainId } from "wagmi";
+import { base } from "wagmi/chains";
+import { useEffect, useState } from "react";
+import { getBasename, getEnsName, verifyReverseResolution } from "@/lib/basenames";
 
 type IdentityProfile = {
   address: `0x${string}`;
@@ -17,52 +18,79 @@ export function useBasenameIdentity() {
   const { address } = useAccount();
   const activeChainId = useChainId();
   const [profile, setProfile] = useState<IdentityProfile | null>(null);
-
-  // 1) Prefer Basename on Base (chainId: 8453)
-  const basename = useEnsName({
-    address,
-    chainId: base.id, // 8453 - Base mainnet
-    query: { enabled: !!address },
-  });
-
-  // 2) Fallback to L1 ENS if no Basename
-  const ens = useEnsName({
-    address,
-    chainId: mainnet.id, // 1 - Ethereum mainnet
-    query: { enabled: !!address && !basename.data },
-  });
-
-  const name = useMemo(() => basename.data ?? ens.data ?? null, [basename.data, ens.data]);
-  const source: IdentityProfile["source"] = basename.data ? "basename" : ens.data ? "ens" : null;
-
-  // 3) Forward verification (name -> address)
-  const forward = useEnsAddress({
-    name: name ?? undefined,
-    chainId: mainnet.id,               // .eth resolves on L1; basenames are bridged
-    query: { enabled: !!name },
-  });
-
-  const reverseOK =
-    !!address && !!forward.data && forward.data.toLowerCase() === address?.toLowerCase();
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (!address) return setProfile(null);
-    const did = `did:pkh:eip155:${activeChainId ?? base.id}:${address}`;
-    
-    // Debug logging
-    console.log("Basename Identity Debug:", {
-      address,
-      basenameData: basename.data,
-      ensData: ens.data,
-      name,
-      source,
-      reverseOK,
-      basenameLoading: basename.isFetching,
-      ensLoading: ens.isFetching,
-    });
-    
-    setProfile({ address, name, source, reverseOK, did });
-  }, [address, activeChainId, name, source, reverseOK, basename.data, ens.data, basename.isFetching, ens.isFetching]);
+    if (!address) {
+      setProfile(null);
+      return;
+    }
 
-  return { profile, isLoading: !address || basename.isFetching || ens.isFetching };
+    const resolveIdentity = async () => {
+      setIsLoading(true);
+      
+      try {
+        // 1) Try to resolve Basename on Base first
+        console.log("Resolving Basename for address:", address);
+        const basename = await getBasename(address);
+        console.log("Basename result:", basename);
+        
+        let name: string | null = null;
+        let source: IdentityProfile["source"] = null;
+        
+        if (basename) {
+          name = basename;
+          source = "basename";
+        } else {
+          // 2) Fallback to ENS on Mainnet
+          console.log("No Basename found, trying ENS...");
+          const ensName = await getEnsName(address);
+          console.log("ENS result:", ensName);
+          
+          if (ensName) {
+            name = ensName;
+            source = "ens";
+          }
+        }
+        
+        // 3) Verify reverse resolution if we found a name
+        let reverseOK = false;
+        if (name) {
+          console.log("Verifying reverse resolution for:", name);
+          reverseOK = await verifyReverseResolution(name, address);
+          console.log("Reverse verification result:", reverseOK);
+        }
+        
+        const did = `did:pkh:eip155:${activeChainId ?? base.id}:${address}`;
+        
+        const newProfile: IdentityProfile = {
+          address,
+          name,
+          source,
+          reverseOK,
+          did,
+        };
+        
+        console.log("Final profile:", newProfile);
+        setProfile(newProfile);
+        
+      } catch (error) {
+        console.error("Error resolving identity:", error);
+        const did = `did:pkh:eip155:${activeChainId ?? base.id}:${address}`;
+        setProfile({
+          address,
+          name: null,
+          source: null,
+          reverseOK: false,
+          did,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    resolveIdentity();
+  }, [address, activeChainId]);
+
+  return { profile, isLoading };
 }

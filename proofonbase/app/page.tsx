@@ -1156,12 +1156,26 @@ export default function ProofOnBaseApp() {
                         <p className="text-sm text-muted-foreground">
                           Resolving name...
                         </p>
+                        <button
+                          onClick={() => window.location.reload()}
+                          className="text-xs text-primary hover:underline mt-2"
+                        >
+                          Refresh if stuck
+                        </button>
                       </div>
                     ) : identityProfile ? (
                       <div className="mb-6 p-4 bg-muted/50 rounded-lg border border-border text-left">
-                        <h4 className="text-sm font-medium text-foreground mb-3">
-                          Identity Profile
-                        </h4>
+                        <div className="flex justify-between items-center mb-3">
+                          <h4 className="text-sm font-medium text-foreground">
+                            Identity Profile
+                          </h4>
+                          <button
+                            onClick={() => window.location.reload()}
+                            className="text-xs text-primary hover:underline"
+                          >
+                            Refresh
+                          </button>
+                        </div>
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">
