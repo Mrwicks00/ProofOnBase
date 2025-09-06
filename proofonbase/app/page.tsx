@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -103,13 +103,18 @@ export default function ProofOnBaseApp() {
   const { writeContract, isPending: isContractPending } = useWriteContract();
 
   // Our custom hooks
-  const { get: getCredential, set: setCredential } = useCredential();
+  const {
+    get: getCredential,
+    set: setCredential,
+    clear: clearCredential,
+  } = useCredential();
   const { get: getUserDid, clear: clearUserDid } = useDid();
 
   // App state
   const [isRegistering, setIsRegistering] = useState(false);
   const [credential, setCredentialState] = useState<AgeCredential | null>(null);
   const [isIssuing, setIsIssuing] = useState(false);
+  const [activeTab, setActiveTab] = useState("issue");
 
   // Client-side mounting check
   const [mounted, setMounted] = useState(false);
@@ -149,27 +154,48 @@ export default function ProofOnBaseApp() {
     typeof window !== "undefined" ? getCredential() : null;
   const storedUserDid = typeof window !== "undefined" ? getUserDid() : null;
 
+  // Only show credential if it belongs to current wallet
+  const currentUserCredential = useMemo(() => {
+    if (!storedCredential || !address) return null;
+    const currentUserDID = didFromAddress(address);
+    // Check if credential belongs to current wallet (either address-based or name-based DID)
+    const belongsToCurrentWallet =
+      storedCredential.subjectDid === currentUserDID ||
+      storedCredential.subjectDid === userDID;
+    return belongsToCurrentWallet ? storedCredential : null;
+  }, [storedCredential, address, userDID]);
+
   // Debug logging for network detection
   useEffect(() => {
     console.log("Network Debug:", { chainId, isCorrectNetwork, address });
   }, [chainId, isCorrectNetwork, address]);
 
-  // Clear stored DID when wallet address changes
+  // Clear stored DID and credential when wallet address changes
   useEffect(() => {
     if (address && storedUserDid) {
       const currentUserDID = didFromAddress(address);
       if (storedUserDid !== currentUserDID) {
-        console.log("Wallet changed, clearing stored DID:", {
+        console.log("Wallet changed, clearing stored DID and credential:", {
           storedUserDid,
           currentUserDID,
         });
         clearUserDid();
+        // Also clear credential if it doesn't belong to current wallet
+        if (
+          storedCredential &&
+          storedCredential.subjectDid !== currentUserDID
+        ) {
+          clearCredential();
+          setCredentialState(null);
+        }
       }
     } else if (!address && storedUserDid) {
-      console.log("Wallet disconnected, clearing stored DID");
+      console.log("Wallet disconnected, clearing stored DID and credential");
       clearUserDid();
+      clearCredential();
+      setCredentialState(null);
     }
-  }, [address, storedUserDid, clearUserDid]);
+  }, [address, storedUserDid, clearUserDid, storedCredential]);
 
   // Client-side mounting effect
   useEffect(() => {
@@ -275,9 +301,46 @@ export default function ProofOnBaseApp() {
         }`,
       });
     } catch (error: any) {
+      console.error("DID registration error:", error);
+      console.error("Error details:", {
+        message: error.message,
+        code: error.code,
+        action: error.action,
+        reason: error.reason,
+        transaction: error.transaction,
+      });
+
+      // Check for specific error messages
+      let errorTitle = "Registration Failed";
+      let errorDescription = "Failed to register DID";
+
+      if (
+        error.message?.includes("DID already registered") ||
+        error.message?.includes("missing revert data") ||
+        error.code === "CALL_EXCEPTION" ||
+        (error.action === "estimateGas" && error.reason === null) ||
+        (error.transaction?.to ===
+          "0x093E7D57E555c620532d7430C09C147674AAE846" &&
+          error.action === "estimateGas")
+      ) {
+        errorTitle = "DID Already Registered";
+        errorDescription =
+          "This DID has already been registered. You can view your credentials in the 'My Identity' tab.";
+      } else if (error.message?.includes("user rejected")) {
+        errorTitle = "Transaction Cancelled";
+        errorDescription =
+          "You cancelled the transaction. Please try again if you want to register your DID.";
+      } else if (error.message?.includes("insufficient funds")) {
+        errorTitle = "Insufficient Funds";
+        errorDescription =
+          "You don't have enough ETH to pay for the transaction. Please add some ETH to your wallet.";
+      } else if (error.message) {
+        errorDescription = error.message;
+      }
+
       toast({
-        title: "Registration Failed",
-        description: error.message || "Failed to register DID",
+        title: errorTitle,
+        description: errorDescription,
         variant: "destructive",
       });
     } finally {
@@ -836,11 +899,11 @@ export default function ProofOnBaseApp() {
               Awaiting Proof Verification
             </h3>
             <p className="text-muted-foreground mb-4">
-              {storedCredential
+              {currentUserCredential
                 ? "Scan the QR code above to submit your age proof"
                 : "QR code contains challenge - scan to verify age proof"}
             </p>
-            {!storedCredential && (
+            {!currentUserCredential && (
               <p className="text-sm text-blue-400">
                 {isConnected
                   ? "No credential found. Issue a credential first to generate QR code."
@@ -1112,7 +1175,7 @@ export default function ProofOnBaseApp() {
       <main className="container mx-auto px-4 py-8">
         {renderNetworkWarning()}
 
-        <Tabs defaultValue="identity" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3 bg-card border border-border">
             <TabsTrigger
               value="identity"
@@ -1451,7 +1514,7 @@ export default function ProofOnBaseApp() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {!storedCredential ? (
+                {!currentUserCredential ? (
                   <div className="text-center py-8">
                     <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                       <FileText className="w-8 h-8 text-muted-foreground" />
@@ -1470,7 +1533,7 @@ export default function ProofOnBaseApp() {
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
                             <h4 className="font-medium text-white">
-                              {storedCredential.type}
+                              {currentUserCredential.type}
                             </h4>
                             <Badge className="text-xs bg-green-500/20 text-green-400 border-green-500/30">
                               <CheckCircle className="w-3 h-3" />
@@ -1480,13 +1543,13 @@ export default function ProofOnBaseApp() {
                           <p className="text-sm text-muted-foreground mb-1">
                             Issued by:{" "}
                             <code className="font-mono text-xs">
-                              {storedCredential.issuer}
+                              {currentUserCredential.issuer}
                             </code>
                           </p>
                           <p className="text-xs text-muted-foreground">
                             Issued:{" "}
                             {new Date(
-                              storedCredential.issuedAt
+                              currentUserCredential.issuedAt
                             ).toLocaleDateString()}
                           </p>
                         </div>
@@ -1504,7 +1567,7 @@ export default function ProofOnBaseApp() {
                           <DialogContent className="bg-card border-border">
                             <DialogHeader>
                               <DialogTitle className="text-white">
-                                {storedCredential.type}
+                                {currentUserCredential.type}
                               </DialogTitle>
                               <DialogDescription>
                                 Credential details and verification information
@@ -1517,14 +1580,14 @@ export default function ProofOnBaseApp() {
                                 </label>
                                 <div className="flex items-center justify-between p-2 bg-muted rounded mt-1">
                                   <code className="font-mono text-xs text-foreground">
-                                    {storedCredential.subjectDid}
+                                    {currentUserCredential.subjectDid}
                                   </code>
                                   <Button
                                     size="sm"
                                     variant="ghost"
                                     onClick={() =>
                                       copyToClipboard(
-                                        storedCredential.subjectDid,
+                                        currentUserCredential.subjectDid,
                                         "Subject DID"
                                       )
                                     }
@@ -1539,14 +1602,14 @@ export default function ProofOnBaseApp() {
                                 </label>
                                 <div className="flex items-center justify-between p-2 bg-muted rounded mt-1">
                                   <code className="font-mono text-xs text-foreground">
-                                    {storedCredential.issuer}
+                                    {currentUserCredential.issuer}
                                   </code>
                                   <Button
                                     size="sm"
                                     variant="ghost"
                                     onClick={() =>
                                       copyToClipboard(
-                                        storedCredential.issuer,
+                                        currentUserCredential.issuer,
                                         "Issuer DID"
                                       )
                                     }
@@ -1561,12 +1624,12 @@ export default function ProofOnBaseApp() {
                                 </label>
                                 <div className="p-2 bg-muted rounded mt-1">
                                   <code className="font-mono text-xs text-foreground">
-                                    {storedCredential.birthYear}-
-                                    {storedCredential.birthMonth
+                                    {currentUserCredential.birthYear}-
+                                    {currentUserCredential.birthMonth
                                       .toString()
                                       .padStart(2, "0")}
                                     -
-                                    {storedCredential.birthDay
+                                    {currentUserCredential.birthDay
                                       .toString()
                                       .padStart(2, "0")}
                                   </code>
@@ -1579,7 +1642,7 @@ export default function ProofOnBaseApp() {
                                 <div className="p-2 bg-muted rounded mt-1">
                                   <code className="font-mono text-xs text-foreground">
                                     {new Date(
-                                      storedCredential.expiresAt
+                                      currentUserCredential.expiresAt
                                     ).toLocaleDateString()}
                                   </code>
                                 </div>
@@ -1932,7 +1995,7 @@ export default function ProofOnBaseApp() {
                     Scan QR to Verify
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {storedCredential
+                    {currentUserCredential
                       ? "Scan the QR code above to generate and verify your age proof"
                       : "QR code contains challenge - scan to verify age proof (server processes verification)"}
                   </p>
