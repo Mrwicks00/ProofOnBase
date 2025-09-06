@@ -114,7 +114,6 @@ export default function ProofOnBaseApp() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [credential, setCredentialState] = useState<AgeCredential | null>(null);
   const [isIssuing, setIsIssuing] = useState(false);
-  const [activeTab, setActiveTab] = useState("issue");
 
   // Client-side mounting check
   const [mounted, setMounted] = useState(false);
@@ -1175,7 +1174,7 @@ export default function ProofOnBaseApp() {
       <main className="container mx-auto px-4 py-8">
         {renderNetworkWarning()}
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs defaultValue="identity" className="w-full">
           <TabsList className="grid w-full grid-cols-3 bg-card border border-border">
             <TabsTrigger
               value="identity"
