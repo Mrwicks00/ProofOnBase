@@ -4,30 +4,42 @@ dotenv.config();
 
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
+import "@nomicfoundation/hardhat-verify";
 
-// Use a dedicated env var for Base to avoid mixing keys
 const PRIVATE_KEY =
   process.env.BASE_PRIVATE_KEY ||
   "0x0000000000000000000000000000000000000000000000000000000000000000";
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.28",
+  solidity: {
+    version: "0.8.20",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200  
+      },
+      evmVersion: "shanghai"
+    }
+  },
+  
   networks: {
-    // Base Sepolia testnet
     baseSepolia: {
-      // Official RPC: https://sepolia.base.org
-      // (You can swap to an Alchemy/Infura endpoint if you prefer)
       url: process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org",
       chainId: 84532,
       accounts: [PRIVATE_KEY],
     },
   },
+
+  sourcify: {
+    enabled: true,
+    // Optional: specify a different Sourcify server
+    apiUrl: "https://sourcify.dev/server",
+    // Optional: specify a different Sourcify repository
+    browserUrl: "https://repo.sourcify.dev",
+  },
   etherscan: {
-    // You can pass a single string if you only verify on BaseScan Sepolia,
-    // but keeping the object form is future-proof.
     apiKey: {
       baseSepolia: process.env.BASESCAN_API_KEY || "",
-      // (Optional) base: process.env.BASESCAN_MAINNET_API_KEY || ""
     },
     customChains: [
       {

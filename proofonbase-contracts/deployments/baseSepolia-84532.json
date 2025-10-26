@@ -1,0 +1,10 @@
+{
+  "network": "baseSepolia",
+  "chainId": "84532",
+  "deployer": "0x92c7b8C73f9EfAA4D47545B1c0bFaf3375743e79",
+  "DIDRegistry": "0x112f5552bD85Bf18709E668d8f1E9E30B7F5C18e",
+  "CredentialIssuer": "0x204725eF8e5E7CDbaDAB09e78BCB79bdEB75Cc72",
+  "Groth16Verifier": "0x0B0f01f04D803E5B093c3066f351a7D8BcD70EaF",
+  "AgeGate": "0x11c468376129B183339aab1A7757A34eFf351467",
+  "deploymentTime": "2025-10-26T16:49:35.791Z"
+}

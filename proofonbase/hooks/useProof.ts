@@ -145,7 +145,7 @@ export async function verifyDirectlyWithGroth16(params: {
 
   // Call Groth16Verifier directly
   const proofValid = await publicClient.readContract({
-    address: "0xCB2F21E45EA243E3CDF4b168a8d8Aad340d181B5", // Groth16Verifier address
+    address: "0x0B0f01f04D803E5B093c3066f351a7D8BcD70EaF", // Groth16Verifier address
     abi: Groth16VerifierABI,
     functionName: "verifyProof",
     args: [a, b, c, input],
