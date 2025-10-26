@@ -48,8 +48,7 @@ import { generateProof, verifyOnChain } from "@/hooks/useProof";
 import { didFromAddress, truncateAddress } from "@/lib/utils";
 import QRCode from "react-qr-code";
 import { Scanner } from "@yudiel/react-qr-scanner";
-import { ADDRESSES } from "@/lib/addresses";
-import { AgeGateABI } from "@/lib/abi/AgeGate";
+
 import {
   Copy,
   Wallet,
