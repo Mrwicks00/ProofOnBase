@@ -6,8 +6,7 @@ import { GeistMono } from "geist/font/mono";
 import { Analytics } from "@vercel/analytics/next";
 import { Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
-import { Providers } from "@/components/providers";
-import "@rainbow-me/rainbowkit/styles.css";
+import ContextProvider from "@/components/providers";
 import "./globals.css";
 
 export default function RootLayout({
@@ -27,11 +26,11 @@ export default function RootLayout({
       <body
         className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased`}
       >
-        <Providers>
+        <ContextProvider cookies={null}>
           <Suspense fallback={null}>{children}</Suspense>
           <Toaster />
           <Analytics />
-        </Providers>
+        </ContextProvider>
       </body>
     </html>
   );

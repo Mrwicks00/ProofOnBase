@@ -29,7 +29,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+// import { ConnectButton } from "@rainbow-me/rainbowkit";
 import {
   useAccount,
   useBalance,
@@ -1163,7 +1163,7 @@ export default function ProofOnBaseApp() {
               </Button>
               {renderWalletInfo()}
               <div className="scale-90 sm:scale-100">
-                <ConnectButton />
+              <appkit-button />
               </div>
             </div>
           </div>
@@ -1222,7 +1222,7 @@ export default function ProofOnBaseApp() {
                     <p className="text-muted-foreground mb-4">
                       Connect your wallet to get started
                     </p>
-                    <ConnectButton />
+                    <appkit-button />
                   </div>
                 ) : !storedUserDid ? (
                   <div className="text-center py-8">
